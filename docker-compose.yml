@@ -1,0 +1,112 @@
+version: "3"
+services:
+
+  # HTTP Proxy
+  nginx-proxy:
+    container_name: nginx-proxy
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - '/data/nginx-proxy/conf.d:/etc/nginx/conf.d:Z'
+      - '/data/nginx-proxy/certs:/etc/nginx/certs:ro'
+      - '/data/nginx-proxy/vhost.d:/etc/nginx/vhost.d:Z'
+      - '/data/nginx-proxy/html:/usr/share/nginx/html:Z'
+      - '/data/nginx-proxy/htpasswd:/etc/nginx/htpasswd'
+      - '/var/run/docker.sock:/tmp/docker.sock:ro'
+    labels:
+      - com.github.jrcs.letsencrypt_nginx_proxy_companion.nginx_proxy=true
+    restart: unless-stopped
+    image: 'jwilder/nginx-proxy'
+
+  # SSL
+  letsencrypt-nginx-proxy-companion:
+    container_name: nginx-proxy-letsencrypt
+    depends_on:
+      - "nginx-proxy"
+    environment:
+      - NGINX_PROXY_CONTAINER=nginx-proxy
+    volumes:
+      - '/data/nginx-proxy/conf.d:/etc/nginx/conf.d:Z'
+      - '/data/nginx-proxy/certs:/etc/nginx/certs:Z'
+      - '/data/nginx-proxy/vhost.d:/etc/nginx/vhost.d:Z'
+      - '/var/run/docker.sock:/var/run/docker.sock:ro'
+      - '/data/nginx-proxy/html:/usr/share/nginx/html:Z'
+    restart: unless-stopped
+    image: 'jrcs/letsencrypt-nginx-proxy-companion'
+
+  # TeamCity
+  teamcity-server:
+    container_name: teamcity-server
+    environment:
+      - VIRTUAL_HOST=build.monolythme.com
+      - LETSENCRYPT_HOST=build.monolythme.com
+      - HTTPS_METHOD=noredirect
+    ports:
+      - '8111:8111'
+    volumes:
+      - '/data/teamcity-server/datadir:/data/teamcity_server/datadir:Z'
+      - '/data/teamcity-server/logs:/opt/teamcity/logs:Z'
+    restart: unless-stopped
+    image: 'jetbrains/teamcity-server:2020.1.1'
+
+  teamcity-agent-1:
+    container_name: teamcity-agent-1
+    depends_on:
+      - teamcity-server
+    environment:
+      - 'SERVER_URL=teamcity-server:8111'
+    volumes:
+      - '/var/run/docker.sock:/var/run/docker.sock'
+      - '/data/teamcity-agent-1/conf:/data/teamcity_agent/conf:Z'
+    restart: unless-stopped
+    image: 'jetbrains/teamcity-agent:2020.1.1'
+
+  teamcity-agent-2:
+    container_name: teamcity-agent-2
+    depends_on:
+      - teamcity-server
+    environment:
+      - 'SERVER_URL=teamcity-server:8111'
+    volumes:
+      - '/var/run/docker.sock:/var/run/docker.sock'
+      - '/data/teamcity-agent-2/conf:/data/teamcity_agent/conf:Z'
+    restart: unless-stopped
+    image: 'jetbrains/teamcity-agent:2020.1.1'
+
+  teamcity-agent-3:
+    container_name: teamcity-agent-3
+    depends_on:
+      - teamcity-server
+    environment:
+      - 'SERVER_URL=teamcity-server:8111'
+    volumes:
+      - '/var/run/docker.sock:/var/run/docker.sock'
+      - '/data/teamcity-agent-3/conf:/data/teamcity_agent/conf:Z'
+    restart: unless-stopped
+    image: 'jetbrains/teamcity-agent:2020.1.1'
+
+  # Docker Registry for Internal Use
+  registry:
+    container_name: registry
+    environment:
+      - VIRTUAL_HOST=docker.monolythme.com
+      - LETSENCRYPT_HOST=docker.monolythme.com
+      - REGISTRY_STORAGE_DELETE_ENABLED=true
+    ports:
+      - '5000:5000'
+    volumes:
+      - '/data/registry:/var/lib/registry'
+    restart: unless-stopped
+    image: 'registry:latest'
+
+  # Monolyth Server
+  monolyth-server:
+    container_name: monolyth-server
+    environment:
+      - VIRTUAL_HOST=api.monolyth.com
+      - LETSENCRYPT_HOST=api.monolyth.com
+    volumes:
+      - '/data/monolyth-server:/data'
+    restart: unless-stopped
+    image: 'monolyth-server:latest'

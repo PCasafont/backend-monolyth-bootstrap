@@ -1,0 +1,5 @@
+const val kotlinVersion = "1.3.72"
+const val coroutinesVersion = "1.3.7"
+const val ktorVersion = "1.3.2"
+const val koinVersion = "2.0.1"
+const val exposedVersion = "0.26.1"
